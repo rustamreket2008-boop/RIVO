@@ -8,7 +8,6 @@
         android:allowBackup="true"
         android:label="RIVO"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
