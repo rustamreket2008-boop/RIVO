@@ -1,0 +1,29 @@
+{
+"project_info": {
+"project_number": "577832954741",
+"project_id": "rivo-6090b",
+"storage_bucket": "rivo-6090b.firebasestorage.app"
+},
+"client": [
+{
+"client_info": {
+"mobilesdk_app_id": "1:577832954741:android:acc1931efb184877ca413c",
+"android_client_info": {
+"package_name": "com.rivo.app"
+}
+},
+"oauth_client": [],
+"api_key": [
+{
+"current_key": "AIzaSyABE3PgN-L11guycCqapwrPjJUFclkKseU"
+}
+],
+"services": {
+"appinvite_service": {
+"other_platform_oauth_client": []
+}
+}
+}
+],
+"configuration_version": "1"
+}
