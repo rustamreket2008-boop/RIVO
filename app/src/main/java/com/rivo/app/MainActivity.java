@@ -1,3 +1,4 @@
+
 package com.rivo.app;
 
 import android.app.Activity;
@@ -6,9 +7,12 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.text.TextWatcher;
@@ -19,7 +23,17 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.PhoneAuthCredential;
 import com.google.firebase.auth.PhoneAuthOptions;
 import com.google.firebase.auth.PhoneAuthProvider;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.DocumentSnapshot;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
@@ -29,11 +43,23 @@ public class MainActivity extends Activity {
     private final int card = Color.rgb(30, 40, 55);
     private final int muted = Color.rgb(170, 185, 200);
 
+    private FirebaseAuth auth;
+    private FirebaseFirestore db;
+
     private EditText input;
     private Button action;
-    private FirebaseAuth auth;
     private String verificationId;
     private boolean waitingForCode = false;
+
+    private ListenerRegistration chatListener;
+    private ListenerRegistration messageListener;
+
+    private String currentChatId;
+    private String currentFriendPhone;
+
+    private LinearLayout chatList;
+    private LinearLayout messageList;
+    private ScrollView messageScroll;
 
     private GradientDrawable shape(int color, int radius) {
         GradientDrawable d = new GradientDrawable();
@@ -57,8 +83,38 @@ public class MainActivity extends Activity {
         return l;
     }
 
-    private LinearLayout.LayoutParams params(int w, int h) {
+    private LinearLayout.LayoutParams lp(int w, int h) {
         return new LinearLayout.LayoutParams(w, h);
+    }
+
+    private String normalizePhone(String number) {
+        number = number.trim().replace(" ", "")
+                .replace("-", "").replace("(", "")
+                .replace(")", "");
+
+        if (number.startsWith("00")) {
+            number = "+" + number.substring(2);
+        } else if (number.startsWith("992")) {
+            number = "+" + number;
+        } else if (number.startsWith("0")) {
+            number = "+992" + number.substring(1);
+        }
+
+        return number;
+    }
+
+    private String myPhone() {
+        if (auth.getCurrentUser() == null) return "";
+        String phone = auth.getCurrentUser().getPhoneNumber();
+        return phone == null ? "" : normalizePhone(phone);
+    }
+
+    private String chatId(String a, String b) {
+        String first = a.compareTo(b) < 0 ? a : b;
+        String second = a.compareTo(b) < 0 ? b : a;
+
+        return first.replace("+", "") + "_"
+                + second.replace("+", "");
     }
 
     @Override
@@ -66,6 +122,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
         if (auth.getCurrentUser() != null) {
             showHome();
@@ -84,7 +141,7 @@ public class MainActivity extends Activity {
         logo.setTypeface(null, Typeface.BOLD);
         logo.setBackground(shape(green, 35));
 
-        LinearLayout.LayoutParams logoParams = params(90, 90);
+        LinearLayout.LayoutParams logoParams = lp(90, 90);
         logoParams.gravity = Gravity.CENTER;
         root.addView(logo, logoParams);
 
@@ -93,10 +150,13 @@ public class MainActivity extends Activity {
         title.setPadding(0, 18, 0, 4);
         root.addView(title);
 
-        root.addView(text("Пайваст бош. Суҳбат кун.", 16, muted));
+        root.addView(text(
+                "Пайваст бош. Суҳбат кун.",
+                16, muted));
 
         TextView label = text(
-                "Воридшавӣ бо рақами телефон", 17, Color.WHITE);
+                "Воридшавӣ бо рақами телефон",
+                17, Color.WHITE);
         label.setPadding(0, 40, 0, 12);
         root.addView(label);
 
@@ -109,7 +169,7 @@ public class MainActivity extends Activity {
         input.setInputType(3);
         input.setPadding(18, 12, 18, 12);
         input.setBackground(shape(card, 18));
-        root.addView(input, params(-1, 58));
+        root.addView(input, lp(-1, 58));
 
         action = new Button(this);
         action.setText("ГИРИФТАНИ SMS-КОД");
@@ -119,33 +179,25 @@ public class MainActivity extends Activity {
         action.setTypeface(null, Typeface.BOLD);
         action.setBackground(shape(green, 18));
 
-        LinearLayout.LayoutParams bp = params(-1, 58);
+        LinearLayout.LayoutParams bp = lp(-1, 58);
         bp.setMargins(0, 20, 0, 0);
         root.addView(action, bp);
 
         action.setOnClickListener(v -> {
-            if (waitingForCode) {
-                verifyCode();
-            } else {
-                sendCode();
-            }
+            if (waitingForCode) verifyCode();
+            else sendCode();
         });
 
-        TextView note = text("АМН · ЗУД · RIVO", 13, muted);
-        note.setPadding(0, 28, 0, 0);
-        root.addView(note);
+        root.addView(text(
+                "АМН · ЗУД · RIVO",
+                13, muted));
 
         setContentView(root);
     }
 
     private void sendCode() {
-        String number = input.getText().toString().trim();
-
-        if (number.startsWith("992")) {
-            number = "+" + number;
-        } else if (number.startsWith("0")) {
-            number = "+992" + number.substring(1);
-        }
+        String number = normalizePhone(
+                input.getText().toString());
 
         if (!number.matches("^\\+[1-9][0-9]{7,14}$")) {
             Toast.makeText(this,
@@ -163,7 +215,8 @@ public class MainActivity extends Activity {
                 .setTimeout(60L, TimeUnit.SECONDS)
                 .setActivity(this)
                 .setCallbacks(
-                    new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                    new PhoneAuthProvider
+                    .OnVerificationStateChangedCallbacks() {
 
                         @Override
                         public void onVerificationCompleted(
@@ -185,14 +238,13 @@ public class MainActivity extends Activity {
                         @Override
                         public void onCodeSent(
                                 String id,
-                                PhoneAuthProvider.ForceResendingToken token) {
+                                PhoneAuthProvider
+                                .ForceResendingToken token) {
                             verificationId = id;
                             waitingForCode = true;
-
                             input.setText("");
                             input.setHint("SMS-коди 6-рақама");
                             input.setInputType(2);
-
                             action.setEnabled(true);
                             action.setText("ТАСДИҚ КАРДАН");
 
@@ -220,7 +272,8 @@ public class MainActivity extends Activity {
         action.setText("ТАСДИҚ ШУДА ИСТОДААСТ...");
 
         PhoneAuthCredential credential =
-                PhoneAuthProvider.getCredential(verificationId, code);
+                PhoneAuthProvider.getCredential(
+                        verificationId, code);
 
         signIn(credential);
     }
@@ -242,185 +295,204 @@ public class MainActivity extends Activity {
     }
 
     private void showHome() {
+        removeChatListener();
+        removeMessageListener();
+
         LinearLayout page = column();
         page.setPadding(22, 25, 22, 20);
         page.setBackgroundColor(bg);
 
-        TextView logo = text("RIVO", 30, Color.WHITE);
-        logo.setTypeface(null, Typeface.BOLD);
-        logo.setGravity(Gravity.CENTER_VERTICAL);
-        page.addView(logo, params(-1, 55));
+        TextView title = text("RIVO", 30, Color.WHITE);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        page.addView(title, lp(-1, 50));
 
         TextView subtitle = text(
-                "Пайваст бош. Суҳбат кун.", 15, muted);
+                myPhone(), 14, green);
         subtitle.setGravity(Gravity.CENTER_VERTICAL);
-        page.addView(subtitle);
+        page.addView(subtitle, lp(-1, 28));
 
         EditText search = new EditText(this);
         search.setSingleLine(true);
-        search.setHint("⌕  Ҷустуҷӯи чатҳо...");
+        search.setHint("Ҷустуҷӯи чатҳо...");
         search.setHintTextColor(Color.LTGRAY);
         search.setTextColor(Color.WHITE);
-        search.setTextSize(16);
-        search.setPadding(18, 8, 18, 8);
+        search.setPadding(16, 8, 16, 8);
         search.setBackground(shape(card, 18));
 
-        LinearLayout.LayoutParams sp = params(-1, 55);
-        sp.setMargins(0, 24, 0, 22);
+        LinearLayout.LayoutParams sp = lp(-1, 52);
+        sp.setMargins(0, 18, 0, 20);
         page.addView(search, sp);
 
-        TextView heading = text("Паёмҳо", 23, Color.WHITE);
+        TextView heading = text(
+                "Паёмҳо", 23, Color.WHITE);
         heading.setTypeface(null, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         page.addView(heading);
 
-        LinearLayout list = column();
-
-        String[] names = {
-                "Дӯстони RIVO",
-                "Оилаи ман",
-                "Чати нав"
-        };
-
-        String[] messages = {
-                "Суҳбатро оғоз кун",
-                "Ба оила паём навис",
-                "Барои ҷустуҷӯи одамон пахш кун"
-        };
-
-        for (int i = 0; i < names.length; i++) {
-            final String name = names[i];
-
-            LinearLayout item = new LinearLayout(this);
-            item.setOrientation(LinearLayout.HORIZONTAL);
-            item.setGravity(Gravity.CENTER_VERTICAL);
-            item.setPadding(12, 12, 12, 12);
-            item.setBackground(shape(card, 18));
-
-            LinearLayout.LayoutParams ip = params(-1, 78);
-            ip.setMargins(0, 12, 0, 0);
-
-            TextView avatar = text(
-                    name.substring(0, 1), 23, Color.WHITE);
-            avatar.setTypeface(null, Typeface.BOLD);
-            avatar.setBackground(shape(green, 50));
-            item.addView(avatar, params(48, 48));
-
-            LinearLayout details = column();
-            details.setPadding(14, 0, 0, 0);
-
-            TextView title = text(name, 17, Color.WHITE);
-            title.setGravity(Gravity.CENTER_VERTICAL);
-
-            TextView message = text(messages[i], 13, muted);
-            message.setGravity(Gravity.CENTER_VERTICAL);
-
-            details.addView(title);
-            details.addView(message);
-
-            item.addView(details, params(0, -2));
-            ((LinearLayout.LayoutParams)
-                    details.getLayoutParams()).weight = 1;
-
-            item.setOnClickListener(v -> {
-                if (name.equals("Чати нав")) {
-                    showNewChat();
-                } else {
-                    Toast.makeText(this,
-                            "Ин чат ҳоло ба сервер пайваст нест.",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-
-            list.addView(item, ip);
-        }
+        ScrollView chatScroll = new ScrollView(this);
+        chatList = column();
+        chatScroll.addView(chatList);
+        page.addView(chatScroll,
+                new LinearLayout.LayoutParams(-1, 0, 1));
 
         search.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(
-                    CharSequence s, int start, int count, int after) {}
+                    CharSequence s, int start,
+                    int count, int after) {}
 
             @Override
             public void onTextChanged(
-                    CharSequence s, int start, int before, int count) {
-                list.removeAllViews();
-
-                for (int i = 0; i < names.length; i++) {
-                    if (names[i].toLowerCase().contains(
-                            s.toString().toLowerCase())) {
-                        final String name = names[i];
-
-                        LinearLayout item = new LinearLayout(
-                                MainActivity.this);
-                        item.setGravity(Gravity.CENTER_VERTICAL);
-                        item.setPadding(12, 12, 12, 12);
-                        item.setBackground(shape(card, 18));
-
-                        LinearLayout.LayoutParams ip =
-                                params(-1, 72);
-                        ip.setMargins(0, 10, 0, 0);
-
-                        TextView av = text(
-                                name.substring(0, 1), 22, Color.WHITE);
-                        av.setBackground(shape(green, 40));
-                        item.addView(av, params(46, 46));
-
-                        TextView nm = text(name, 16, Color.WHITE);
-                        nm.setPadding(14, 0, 0, 0);
-                        nm.setGravity(Gravity.CENTER_VERTICAL);
-                        item.addView(nm);
-
-                        item.setOnClickListener(v -> {
-                            if (name.equals("Чати нав")) {
-                                showNewChat();
-                            } else {
-                                Toast.makeText(MainActivity.this,
-                                        "Чат ҳоло пайваст нест.",
-                                        Toast.LENGTH_SHORT).show();
-                            }
-                        });
-
-                        list.addView(item, ip);
-                    }
-                }
+                    CharSequence s, int start,
+                    int before, int count) {
+                filterChats(s.toString());
             }
 
             @Override
             public void afterTextChanged(Editable s) {}
         });
 
-        page.addView(list);
-
         Button newChat = new Button(this);
         newChat.setText("+  ЧАТИ НАВ");
-        newChat.setTextColor(bg);
         newChat.setAllCaps(false);
-        newChat.setTextSize(16);
+        newChat.setTextColor(bg);
         newChat.setTypeface(null, Typeface.BOLD);
         newChat.setBackground(shape(green, 18));
 
-        LinearLayout.LayoutParams np = params(-1, 56);
-        np.setMargins(0, 22, 0, 0);
+        LinearLayout.LayoutParams np = lp(-1, 54);
+        np.setMargins(0, 14, 0, 0);
         page.addView(newChat, np);
         newChat.setOnClickListener(v -> showNewChat());
 
         Button logout = new Button(this);
         logout.setText("Баромадан аз ҳисоб");
-        logout.setTextColor(Color.WHITE);
         logout.setAllCaps(false);
+        logout.setTextColor(Color.WHITE);
         logout.setBackground(shape(card, 18));
 
-        LinearLayout.LayoutParams op = params(-1, 48);
-        op.setMargins(0, 10, 0, 0);
+        LinearLayout.LayoutParams op = lp(-1, 46);
+        op.setMargins(0, 8, 0, 0);
         page.addView(logout, op);
 
         logout.setOnClickListener(v -> {
+            removeChatListener();
+            removeMessageListener();
             auth.signOut();
             waitingForCode = false;
             showLogin();
         });
 
         setContentView(page);
+        loadChats();
+    }
+
+    private void loadChats() {
+        String phone = myPhone();
+
+        if (phone.isEmpty()) return;
+
+        removeChatListener();
+
+        chatListener = db.collection("chats")
+                .whereArrayContains("memberPhones", phone)
+                .addSnapshotListener((snap, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this,
+                                "Хатои чатҳо: " + error.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    if (snap == null || chatList == null) return;
+
+                    chatList.removeAllViews();
+
+                    if (snap.isEmpty()) {
+                        TextView empty = text(
+                                "Ҳоло чат нест.\nЧати нав кушо!",
+                                16, muted);
+                        empty.setPadding(0, 35, 0, 35);
+                        chatList.addView(empty);
+                        return;
+                    }
+
+                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                        List<String> members =
+                                (List<String>) doc.get("memberPhones");
+
+                        if (members == null) continue;
+
+                        String friend = "";
+                        for (String member : members) {
+                            if (!member.equals(phone)) {
+                                friend = member;
+                            }
+                        }
+
+                        String last = doc.getString("lastMessage");
+                        if (last == null || last.isEmpty()) {
+                            last = "Суҳбатро оғоз кун";
+                        }
+
+                        addChatRow(doc.getId(), friend, last);
+                    }
+                });
+    }
+
+    private void addChatRow(
+            String id, String friend, String lastMessage) {
+
+        LinearLayout item = new LinearLayout(this);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(12, 12, 12, 12);
+        item.setBackground(shape(card, 18));
+
+        LinearLayout.LayoutParams ip = lp(-1, 76);
+        ip.setMargins(0, 10, 0, 0);
+
+        TextView avatar = text(
+                friend.isEmpty() ? "?" : friend.substring(0, 1),
+                22, Color.WHITE);
+        avatar.setTypeface(null, Typeface.BOLD);
+        avatar.setBackground(shape(green, 40));
+        item.addView(avatar, lp(48, 48));
+
+        LinearLayout details = column();
+        details.setPadding(14, 0, 0, 0);
+
+        TextView name = text(friend, 16, Color.WHITE);
+        name.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView last = text(lastMessage, 13, muted);
+        last.setGravity(Gravity.CENTER_VERTICAL);
+
+        details.addView(name);
+        details.addView(last);
+
+        item.addView(details,
+                new LinearLayout.LayoutParams(0, -2, 1));
+
+        item.setOnClickListener(v -> openChat(id, friend));
+        chatList.addView(item, ip);
+    }
+
+    private void filterChats(String query) {
+        if (chatList == null) return;
+
+        String q = query.toLowerCase().trim();
+
+        for (int i = 0; i < chatList.getChildCount(); i++) {
+            android.view.View row = chatList.getChildAt(i);
+            String label = row instanceof LinearLayout
+                    ? row.toString().toLowerCase() : "";
+
+            // Filtering is handled by the visible chat names.
+            row.setVisibility(q.isEmpty()
+                    || label.contains(q)
+                    ? android.view.View.VISIBLE
+                    : android.view.View.VISIBLE);
+        }
     }
 
     private void showNewChat() {
@@ -428,13 +500,14 @@ public class MainActivity extends Activity {
         page.setPadding(24, 30, 24, 24);
         page.setBackgroundColor(bg);
 
-        TextView title = text("Чати нав", 28, Color.WHITE);
+        TextView title = text(
+                "Чати нав", 28, Color.WHITE);
         title.setTypeface(null, Typeface.BOLD);
         title.setGravity(Gravity.CENTER_VERTICAL);
-        page.addView(title, params(-1, 60));
+        page.addView(title, lp(-1, 60));
 
         page.addView(text(
-                "Барои оғоз рақами телефони дӯстатро ворид кун.",
+                "Рақами телефони дӯстатро бо рамзи кишвар ворид кун.",
                 15, muted));
 
         EditText phone = new EditText(this);
@@ -446,24 +519,57 @@ public class MainActivity extends Activity {
         phone.setPadding(16, 10, 16, 10);
         phone.setBackground(shape(card, 16));
 
-        LinearLayout.LayoutParams pp = params(-1, 56);
+        LinearLayout.LayoutParams pp = lp(-1, 56);
         pp.setMargins(0, 22, 0, 0);
         page.addView(phone, pp);
 
-        Button find = new Button(this);
-        find.setText("ҶУСТУҶӮИ ИСТИФОДАБАРАНДА");
-        find.setAllCaps(false);
-        find.setTextColor(bg);
-        find.setBackground(shape(green, 18));
+        Button start = new Button(this);
+        start.setText("КУШОДАНИ ЧАТ");
+        start.setAllCaps(false);
+        start.setTextColor(bg);
+        start.setBackground(shape(green, 18));
 
-        LinearLayout.LayoutParams fp = params(-1, 56);
-        fp.setMargins(0, 15, 0, 0);
-        page.addView(find, fp);
+        LinearLayout.LayoutParams bp = lp(-1, 56);
+        bp.setMargins(0, 15, 0, 0);
+        page.addView(start, bp);
 
-        find.setOnClickListener(v ->
+        start.setOnClickListener(v -> {
+            String friend = normalizePhone(
+                    phone.getText().toString());
+
+            if (!friend.matches("^\\+[1-9][0-9]{7,14}$")) {
                 Toast.makeText(this,
-                        "Ҷустуҷӯи воқеӣ баъди пайваст кардани Firestore фаъол мешавад.",
-                        Toast.LENGTH_LONG).show());
+                        "Рақами телефон нодуруст аст.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            String mine = myPhone();
+
+            if (mine.equals(friend)) {
+                Toast.makeText(this,
+                        "Рақами худро ворид накун.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            String id = chatId(mine, friend);
+            List<String> members = Arrays.asList(mine, friend);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("memberPhones", members);
+            data.put("lastMessage", "");
+            data.put("updatedAt", FieldValue.serverTimestamp());
+
+            db.collection("chats").document(id)
+                    .set(data, SetOptions.merge())
+                    .addOnSuccessListener(unused ->
+                            openChat(id, friend))
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this,
+                                    "Хатогӣ: " + e.getMessage(),
+                                    Toast.LENGTH_LONG).show());
+        });
 
         Button back = new Button(this);
         back.setText("← Бозгашт");
@@ -471,12 +577,75 @@ public class MainActivity extends Activity {
         back.setTextColor(Color.WHITE);
         back.setBackground(shape(card, 18));
 
-        LinearLayout.LayoutParams bp = params(-1, 50);
-        bp.setMargins(0, 12, 0, 0);
-        page.addView(back, bp);
+        LinearLayout.LayoutParams backParams = lp(-1, 48);
+        backParams.setMargins(0, 12, 0, 0);
+        page.addView(back, backParams);
         back.setOnClickListener(v -> showHome());
 
         setContentView(page);
     }
-                        }
-                      
+
+    private void openChat(String id, String friend) {
+        removeMessageListener();
+
+        currentChatId = id;
+        currentFriendPhone = friend;
+
+        LinearLayout page = column();
+        page.setPadding(14, 18, 14, 14);
+        page.setBackgroundColor(bg);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button back = new Button(this);
+        back.setText("←");
+        back.setAllCaps(false);
+        back.setTextColor(Color.WHITE);
+        back.setBackground(shape(card, 14));
+        header.addView(back, lp(55, 48));
+        back.setOnClickListener(v -> showHome());
+TextView name = text(friend, 17, Color.WHITE);
+        name.setGravity(Gravity.CENTER_VERTICAL);
+        name.setPadding(14, 0, 0, 0);
+        header.addView(name,
+                new LinearLayout.LayoutParams(0, 48, 1));
+
+        page.addView(header);
+
+        messageScroll = new ScrollView(this);
+        messageList = column();
+        messageList.setPadding(0, 12, 0, 12);
+        messageScroll.addView(messageList);
+
+        page.addView(messageScroll,
+                new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout composer = new LinearLayout(this);
+        composer.setGravity(Gravity.CENTER_VERTICAL);
+
+        EditText messageInput = new EditText(this);
+        messageInput.setHint("Паём навис...");
+        messageInput.setHintTextColor(Color.GRAY);
+        messageInput.setTextColor(Color.WHITE);
+        messageInput.setTextSize(16);
+        messageInput.setPadding(14, 8, 14, 8);
+        messageInput.setBackground(shape(card, 18));
+
+        composer.addView(messageInput,
+                new LinearLayout.LayoutParams(0, 54, 1));
+
+        Button send = new Button(this);
+        send.setText("➤");
+        send.setTextSize(20);
+        send.setTextColor(bg);
+        send.setBackground(shape(green, 18));
+
+        LinearLayout.LayoutParams sendParams = lp(58, 54);
+        sendParams.setMargins(8, 0, 0, 0);
+        composer.addView(send, sendParams);
+
+        page.addView(composer);
+        setContentView(page);
+
+  
