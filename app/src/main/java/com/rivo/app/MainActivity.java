@@ -1,4 +1,3 @@
-
 package com.rivo.app;
 
 import android.app.Activity;
@@ -7,9 +6,6 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
-import android.view.inputmethod.InputMethodManager;
-import android.content.Context;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -28,8 +24,8 @@ public class MainActivity extends Activity {
 
     private final int bg = Color.rgb(12, 18, 30);
     private final int green = Color.rgb(0, 210, 130);
+    private final int card = Color.rgb(30, 40, 55);
 
-    private LinearLayout root;
     private EditText input;
     private Button action;
     private FirebaseAuth auth;
@@ -57,28 +53,33 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         auth = FirebaseAuth.getInstance();
-        showLogin();
+
+        if (auth.getCurrentUser() != null) {
+            showWelcome();
+        } else {
+            showLogin();
+        }
     }
 
     private void showLogin() {
-        root = new LinearLayout(this);
+        LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
-        root.setPadding(28, 35, 28, 35);
+        root.setPadding(28, 30, 28, 30);
         root.setBackgroundColor(bg);
 
         TextView logo = text("R", 42, Color.WHITE);
         logo.setTypeface(null, Typeface.BOLD);
         logo.setBackground(shape(green, 35));
 
-        LinearLayout.LayoutParams lp =
+        LinearLayout.LayoutParams logoParams =
                 new LinearLayout.LayoutParams(90, 90);
-        lp.gravity = Gravity.CENTER;
-        root.addView(logo, lp);
+        logoParams.gravity = Gravity.CENTER;
+        root.addView(logo, logoParams);
 
-        TextView title = text("RIVO", 34, Color.WHITE);
+        TextView title = text("RIVO", 36, Color.WHITE);
         title.setTypeface(null, Typeface.BOLD);
-        title.setPadding(0, 20, 0, 5);
+        title.setPadding(0, 18, 0, 4);
         root.addView(title);
 
         root.addView(text(
@@ -99,8 +100,7 @@ public class MainActivity extends Activity {
         input.setTextSize(18);
         input.setInputType(3);
         input.setPadding(18, 12, 18, 12);
-        input.setBackground(shape(
-                Color.rgb(30, 40, 55), 18));
+        input.setBackground(shape(card, 18));
 
         root.addView(input, new LinearLayout.LayoutParams(
                 -1, 58));
@@ -108,28 +108,28 @@ public class MainActivity extends Activity {
         action = new Button(this);
         action.setText("ГИРИФТАНИ SMS-КОД");
         action.setTextColor(bg);
-        action.setAllCaps(false);
         action.setTextSize(15);
+        action.setAllCaps(false);
         action.setTypeface(null, Typeface.BOLD);
         action.setBackground(shape(green, 18));
 
-        LinearLayout.LayoutParams bp =
+        LinearLayout.LayoutParams buttonParams =
                 new LinearLayout.LayoutParams(-1, 58);
-        bp.setMargins(0, 20, 0, 0);
-        root.addView(action, bp);
+        buttonParams.setMargins(0, 20, 0, 0);
+        root.addView(action, buttonParams);
 
         action.setOnClickListener(v -> {
-            if (!waitingForCode) {
-                sendCode();
-            } else {
+            if (waitingForCode) {
                 verifyCode();
+            } else {
+                sendCode();
             }
         });
 
         TextView note = text(
-                "Паёмнависии замонавӣ • RIVO",
+                "АМН · ЗУД · RIVO",
                 13, Color.rgb(130, 145, 160));
-        note.setPadding(0, 30, 0, 0);
+        note.setPadding(0, 28, 0, 0);
         root.addView(note);
 
         setContentView(root);
@@ -146,58 +146,58 @@ public class MainActivity extends Activity {
 
         if (!number.matches("^\\+[1-9][0-9]{7,14}$")) {
             Toast.makeText(this,
-                    "Рақамро бо рамзи кишвар навис: +992...",
+                    "Рақамро дуруст навис: +992...",
                     Toast.LENGTH_LONG).show();
             return;
         }
 
-        final String phoneNumber = number;
         action.setEnabled(false);
         action.setText("ИНТИЗОР ШАВЕД...");
 
         PhoneAuthOptions options =
                 PhoneAuthOptions.newBuilder(auth)
-                .setPhoneNumber(phoneNumber)
+                .setPhoneNumber(number)
                 .setTimeout(60L, TimeUnit.SECONDS)
                 .setActivity(this)
-                .setCallbacks(new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                .setCallbacks(
+                    new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
 
-                    @Override
-                    public void onVerificationCompleted(
-                            PhoneAuthCredential credential) {
-                        signIn(credential);
-                    }
+                        @Override
+                        public void onVerificationCompleted(
+                                PhoneAuthCredential credential) {
+                            signIn(credential);
+                        }
 
-                    @Override
-                    public void onVerificationFailed(
-                            FirebaseException e) {
-                        action.setEnabled(true);
-                        action.setText("АЗ НАВ КӮШИШ КУН");
+                        @Override
+                        public void onVerificationFailed(
+                                FirebaseException e) {
+                            action.setEnabled(true);
+                            action.setText("АЗ НАВ КӮШИШ КУН");
 
-                        Toast.makeText(MainActivity.this,
-                                "Хатогӣ: " + e.getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
+                            Toast.makeText(MainActivity.this,
+                                    "Хатогӣ: " + e.getMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        }
 
-                    @Override
-                    public void onCodeSent(
-                            String id,
-                            PhoneAuthProvider.ForceResendingToken token) {
-                        verificationId = id;
-                        waitingForCode = true;
+                        @Override
+                        public void onCodeSent(
+                                String id,
+                                PhoneAuthProvider.ForceResendingToken token) {
+                            verificationId = id;
+                            waitingForCode = true;
 
-                        input.setText("");
-                        input.setHint("SMS-коди 6-рақама");
-                        input.setInputType(2);
+                            input.setText("");
+                            input.setHint("SMS-коди 6-рақама");
+                            input.setInputType(2);
 
-                        action.setEnabled(true);
-                        action.setText("ТАСДИҚ КАРДАН");
+                            action.setEnabled(true);
+                            action.setText("ТАСДИҚ КАРДАН");
 
-                        Toast.makeText(MainActivity.this,
-                                "SMS-код фиристода шуд.",
-                                Toast.LENGTH_LONG).show();
-                    }
-                })
+                            Toast.makeText(MainActivity.this,
+                                    "SMS-код фиристода шуд.",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    })
                 .build();
 
         PhoneAuthProvider.verifyPhoneNumber(options);
@@ -214,10 +214,10 @@ public class MainActivity extends Activity {
         }
 
         action.setEnabled(false);
+        action.setText("ТАСДИҚ ШУДА ИСТОДААСТ...");
 
         PhoneAuthCredential credential =
-                PhoneAuthProvider.getCredential(
-                        verificationId, code);
+                PhoneAuthProvider.getCredential(verificationId, code);
 
         signIn(credential);
     }
@@ -225,11 +225,10 @@ public class MainActivity extends Activity {
     private void signIn(PhoneAuthCredential credential) {
         auth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
-                    action.setEnabled(true);
-
                     if (task.isSuccessful()) {
                         showWelcome();
                     } else {
+                        action.setEnabled(true);
                         action.setText("АЗ НАВ КӮШИШ КУН");
 
                         Toast.makeText(this,
@@ -255,7 +254,9 @@ public class MainActivity extends Activity {
         lp.gravity = Gravity.CENTER;
         page.addView(logo, lp);
 
-        TextView title = text("ХУШ ОМАДӢ БА RIVO!", 25, Color.WHITE);
+        TextView title = text(
+                "ХУШ ОМАДӢ БА RIVO!",
+                25, Color.WHITE);
         title.setTypeface(null, Typeface.BOLD);
         title.setPadding(0, 25, 0, 15);
         page.addView(title);
@@ -264,7 +265,13 @@ public class MainActivity extends Activity {
                 "Рақами телефони ту тасдиқ шуд.",
                 16, Color.LTGRAY));
 
+        TextView info = text(
+                "Қадами навбатӣ — саҳифаи чатҳо.",
+                14, green);
+        info.setPadding(0, 18, 0, 0);
+        page.addView(info);
+
         setContentView(page);
     }
             }
-                    
+            
