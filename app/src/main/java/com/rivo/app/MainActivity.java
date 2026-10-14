@@ -648,4 +648,122 @@ TextView name = text(friend, 17, Color.WHITE);
         page.addView(composer);
         setContentView(page);
 
-  
+  input.getText().toString().trim();
+
+            if (body.isEmpty()) {
+                Toast.makeText(this, "Паём нависед", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (currentChatId == null || currentChatId.isEmpty()) {
+                Toast.makeText(this, "Аввал чатро интихоб кунед", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Map<String, Object> message = new HashMap<>();
+            message.put("text", body);
+
+            if (auth.getCurrentUser() == null) {
+                Toast.makeText(this, "Аввал ворид шавед", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            message.put("senderPhone",
+                    auth.getCurrentUser().getPhoneNumber());
+            message.put("createdAt", FieldValue.serverTimestamp());
+
+            db.collection("chats")
+                    .document(currentChatId)
+                    .collection("messages")
+                    .add(message)
+                    .addOnSuccessListener(documentReference -> {
+                        input.setText("");
+                    })
+                    .addOnFailureListener(e ->
+                            Toast.makeText(
+                                    this,
+                                    "Хатогӣ: " + e.getMessage(),
+                                    Toast.LENGTH_LONG
+                            ).show()
+                    );
+        });
+
+        listenMessages();
+    }
+
+    private void listenMessages() {
+        if (currentChatId == null || currentChatId.isEmpty()) {
+            return;
+        }
+
+        db.collection("chats")
+                .document(currentChatId)
+                .collection("messages")
+                .orderBy("createdAt")
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Toast.makeText(
+                                this,
+                                "Хатогӣ дар гирифтани паёмҳо",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
+
+                    if (snapshots == null) {
+                        return;
+                    }
+
+                    messagesLayout.removeAllViews();
+
+                    for (com.google.firebase.firestore.DocumentSnapshot doc
+                            : snapshots.getDocuments()) {
+
+                        String text = doc.getString("text");
+                        String sender = doc.getString("senderPhone");
+
+                        if (text == null) text = "";
+                        if (sender == null) sender = "";
+
+                        boolean mine = auth.getCurrentUser() != null
+                                && sender.equals(
+                                auth.getCurrentUser().getPhoneNumber());
+
+                        TextView bubble = new TextView(this);
+                        bubble.setText(text);
+                        bubble.setTextSize(16);
+                        bubble.setTextColor(Color.WHITE);
+                        bubble.setPadding(24, 14, 24, 14);
+                        bubble.setMaxWidth((int) (
+                                getResources().getDisplayMetrics().widthPixels
+                                        * 0.75f));
+
+                        GradientDrawable shape = new GradientDrawable();
+                        shape.setColor(mine
+                                ? Color.rgb(0, 137, 102)
+                                : Color.rgb(48, 57, 60));
+                        shape.setCornerRadius(28);
+                        bubble.setBackground(shape);
+
+                        LinearLayout.LayoutParams params =
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT);
+
+                        params.setMargins(8, 6, 8, 6);
+                        params.gravity = mine
+                                ? Gravity.RIGHT : Gravity.LEFT;
+
+                        bubble.setLayoutParams(params);
+                        messagesLayout.addView(bubble);
+                    }
+
+                    if (messagesLayout.getParent() instanceof ScrollView) {
+                        ScrollView scroll =
+                                (ScrollView) messagesLayout.getParent();
+                        scroll.post(() ->
+                                scroll.fullScroll(View.FOCUS_DOWN));
+                    }
+                });
+    }
+            }
