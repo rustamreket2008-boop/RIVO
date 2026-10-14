@@ -7,249 +7,317 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
-import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.EditText;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
     private final int BG = Color.rgb(13, 16, 35);
+    private final int CARD = Color.rgb(27, 31, 57);
     private final int WHITE = Color.WHITE;
     private final int MUTED = Color.rgb(174, 181, 207);
     private final int PINK = Color.rgb(244, 65, 157);
     private final int PURPLE = Color.rgb(126, 75, 255);
 
-    private int dp(int value) {
-        return (int) (value *
+    private EditText phoneInput;
+    private EditText passwordInput;
+    private EditText nameInput;
+
+    private int dp(int n) {
+        return (int) (n *
                 getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private GradientDrawable rounded(
-            int color, int radius) {
-
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(color);
-        shape.setCornerRadius(dp(radius));
-        return shape;
+    private GradientDrawable shape(int color, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radius));
+        return d;
     }
 
-    private GradientDrawable gradientButton() {
-        GradientDrawable shape = new GradientDrawable(
+    private GradientDrawable gradient() {
+        GradientDrawable d = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{PINK, PURPLE}
-        );
-        shape.setCornerRadius(dp(20));
-        return shape;
+                new int[]{PINK, PURPLE});
+        d.setCornerRadius(dp(18));
+        return d;
     }
 
-    private TextView text(
-            String value, int size, int color, boolean bold) {
+    private LinearLayout column() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        return l;
+    }
 
+    private TextView label(String value, int size,
+                           int color, boolean bold) {
         TextView t = new TextView(this);
         t.setText(value);
         t.setTextSize(size);
         t.setTextColor(color);
-        t.setGravity(Gravity.CENTER_VERTICAL);
 
         if (bold) {
             t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         }
-
         return t;
     }
 
-    private LinearLayout column() {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        return layout;
+    private void space(LinearLayout parent, int height) {
+        parent.addView(new android.view.View(this),
+                new LinearLayout.LayoutParams(-1, dp(height)));
     }
 
-    private LinearLayout.LayoutParams params(
-            int width, int height) {
-        return new LinearLayout.LayoutParams(
-                width < 0 ? width : dp(width),
-                height < 0 ? height : dp(height)
-        );
+    private TextView button(String title) {
+        TextView b = label(title, 16, WHITE, true);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(gradient());
+
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(-1, dp(54));
+        p.topMargin = dp(12);
+        b.setLayoutParams(p);
+
+        return b;
     }
 
-    private void addSpace(LinearLayout parent, int height) {
-        View space = new View(this);
-        parent.addView(space, params(1, height));
+    private EditText field(String hint, int inputType) {
+        EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setTextSize(15);
+        e.setHint(hint);
+        e.setHintTextColor(MUTED);
+        e.setTextColor(WHITE);
+        e.setPadding(dp(16), 0, dp(16), 0);
+        e.setInputType(inputType);
+        e.setBackground(shape(CARD, 15));
+
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(-1, dp(54));
+        p.topMargin = dp(10);
+        e.setLayoutParams(p);
+
+        return e;
     }
 
-    private LinearLayout makeCard() {
-        LinearLayout card = column();
-        card.setPadding(dp(18), dp(17), dp(18), dp(17));
-        card.setBackground(rounded(Color.rgb(27, 31, 57), 22));
-        return card;
-    }
-
-    private void addFeature(
-            LinearLayout parent,
-            String symbol,
-            String heading,
-            String description) {
-
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14), dp(12), dp(14), dp(12));
-        row.setBackground(rounded(Color.rgb(27, 31, 57), 18));
-
-        TextView icon = text(symbol, 25, WHITE, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(rounded(Color.rgb(55, 43, 91), 15));
-
-        row.addView(icon, params(52, 52));
-
-        LinearLayout details = column();
-        details.setPadding(dp(14), 0, 0, 0);
-
-        details.addView(text(heading, 16, WHITE, true));
-        addSpace(details, 4);
-        details.addView(text(description, 12, MUTED, false));
-
-        row.addView(details,
-                new LinearLayout.LayoutParams(0, -2, 1));
-
-        parent.addView(row, params(-1, -2));
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
+    private void prepareScreen() {
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+    }
 
+    private LinearLayout baseLayout() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
 
         LinearLayout root = column();
-        root.setPadding(dp(22), dp(20), dp(22), dp(28));
-
+        root.setPadding(dp(24), dp(25), dp(24), dp(30));
         scroll.addView(root);
 
-        // TOP BAR
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.rivo_logo);
-        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-
-        top.addView(logo, params(48, 48));
-
-        LinearLayout brand = column();
-        brand.setPadding(dp(12), 0, 0, 0);
-        brand.addView(text("RIVO", 23, WHITE, true));
-        brand.addView(text("CONNECT • SHARE", 9, MUTED, true));
-
-        top.addView(brand,
-                new LinearLayout.LayoutParams(0, -2, 1));
-
-        TextView status = text("● ONLINE", 11,
-                Color.rgb(107, 235, 168), true);
-        status.setPadding(dp(10), dp(8), dp(10), dp(8));
-        status.setBackground(rounded(Color.rgb(28, 54, 57), 20));
-        top.addView(status);
-
-        root.addView(top);
-        addSpace(root, 30);
-
-        // HERO
-        TextView smallTitle = text(
-                "САЛОМ, ХУШ ОМАДӢ!", 12, PINK, true);
-        root.addView(smallTitle);
-
-        addSpace(root, 9);
-
-        TextView title = text(
-                "Ҳамаи дӯстони ту,\nдар як ҷо.", 31, WHITE, true);
-        title.setLineSpacing(dp(4), 1f);
-        root.addView(title);
-
-        addSpace(root, 10);
-
-        TextView subtitle = text(
-                "Бо RIVO пайваст шав, суҳбат кун\nва лаҳзаҳои хубро мубодила намо.",
-                14, MUTED, false);
-        subtitle.setLineSpacing(dp(5), 1f);
-        root.addView(subtitle);
-
-        addSpace(root, 24);
-
-        // MAIN CARD
-        LinearLayout hero = column();
-        hero.setPadding(dp(20), dp(22), dp(20), dp(20));
-        hero.setBackground(gradientButton());
-
-        TextView heroIcon = text("✦", 36, WHITE, true);
-        heroIcon.setGravity(Gravity.CENTER);
-        hero.addView(heroIcon, params(-1, 55));
-
-        addSpace(hero, 8);
-
-        TextView heroTitle = text(
-                "Ҷаҳони нави ту", 22, WHITE, true);
-        heroTitle.setGravity(Gravity.CENTER);
-        hero.addView(heroTitle);
-
-        addSpace(hero, 7);
-
-        TextView heroDesc = text(
-                "Бо одамон пайваст шав ва\nсуҳбатҳои худро оғоз кун.",
-                14, WHITE, false);
-        heroDesc.setGravity(Gravity.CENTER);
-        heroDesc.setLineSpacing(dp(4), 1f);
-        hero.addView(heroDesc);
-
-        addSpace(hero, 18);
-
-        TextView start = text(
-                "ОҒОЗ КАРДАН     →", 15, PURPLE, true);
-        start.setGravity(Gravity.CENTER);
-        start.setBackground(rounded(WHITE, 17));
-        hero.addView(start, params(-1, 53));
-
-        start.setOnClickListener(v ->
-                Toast.makeText(this,
-                        "Қадами навбатӣ: сохтани саҳифаи чат",
-                        Toast.LENGTH_SHORT).show());
-
-        root.addView(hero, params(-1, -2));
-
-        addSpace(root, 28);
-
-        // FEATURES
-        root.addView(text("ИМКОНИЯТҲОИ RIVO", 13, MUTED, true));
-        addSpace(root, 14);
-
-        addFeature(root, "✉", "Паёмҳо",
-                "Бо дӯстони худ суҳбат кун");
-
-        addSpace(root, 11);
-
-        addFeature(root, "♧", "Дӯстон",
-                "Муошират ва шиносоӣ");
-
-        addSpace(root, 11);
-
-        addFeature(root, "◉", "Профил",
-                "Маълумоти шахсии худро бин");
-
-        addSpace(root, 25);
-
-        // FOOTER
-        TextView footer = text(
-                "RIVO  •  CONNECT. SHARE. DISCOVER.",
-                10, MUTED, true);
-        footer.setGravity(Gravity.CENTER);
-        root.addView(footer, params(-1, 35));
-
         setContentView(scroll);
+        return root;
     }
+
+    private void addBrand(LinearLayout root) {
+        TextView logo = label("R", 32, WHITE, true);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(gradient());
+
+        LinearLayout.LayoutParams lp =
+                new LinearLayout.LayoutParams(dp(58), dp(58));
+        lp.bottomMargin = dp(18);
+        root.addView(logo, lp);
+
+        root.addView(label("RIVO", 29, WHITE, true));
+        space(root, 5);
+        root.addView(label(
+                "CONNECT • SHARE • DISCOVER", 11, MUTED, true));
     }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        prepareScreen();
+        showHome();
+    }
+
+    private void showHome() {
+        LinearLayout root = baseLayout();
+
+        addBrand(root);
+        space(root, 45);
+
+        root.addView(label(
+                "Ҳамаи дӯстони ту,\nдар як ҷо.", 30, WHITE, true));
+
+        space(root, 14);
+
+        TextView description = label(
+                "Бо RIVO пайваст шав, суҳбат кун\n"
+                + "ва лаҳзаҳои худро мубодила намо.",
+                15, MUTED, false);
+        description.setLineSpacing(dp(5), 1f);
+        root.addView(description);
+
+        space(root, 30);
+
+        LinearLayout card = column();
+        card.setPadding(dp(20), dp(22), dp(20), dp(22));
+        card.setBackground(shape(CARD, 22));
+
+        card.addView(label("✦  Ҷаҳони нави ту", 21, WHITE, true));
+        space(card, 12);
+        card.addView(label(
+                "Бо дӯстони худ робита барқарор кун.",
+                14, MUTED, false));
+
+        TextView login = button("ВОРИД ШУДАН");
+        login.setOnClickListener(v -> showLogin());
+        card.addView(login);
+
+        TextView register = label(
+                "Ҳисоб надорӣ?  Сабти ном кун", 14, WHITE, true);
+        register.setGravity(Gravity.CENTER);
+        register.setPadding(0, dp(22), 0, dp(8));
+        register.setOnClickListener(v -> showRegister());
+        card.addView(register);
+
+        root.addView(card,
+                new LinearLayout.LayoutParams(-1, -2));
+
+        space(root, 28);
+
+        TextView footer = label(
+                "RIVO • Муошират осонтар мешавад",
+                12, MUTED, false);
+        footer.setGravity(Gravity.CENTER);
+        root.addView(footer);
+    }
+
+    private void showLogin() {
+        LinearLayout root = baseLayout();
+
+        TextView back = label("←  Бозгашт", 15, MUTED, true);
+        back.setOnClickListener(v -> showHome());
+        root.addView(back);
+
+        space(root, 35);
+        addBrand(root);
+        space(root, 35);
+
+        root.addView(label("Хуш омадӣ!", 27, WHITE, true));
+        space(root, 8);
+        root.addView(label(
+                "Ба ҳисоби RIVO-и худ ворид шав.",
+                14, MUTED, false));
+
+        space(root, 25);
+
+        root.addView(label("Рақами телефон", 14, WHITE, true));
+        phoneInput = field("Рақами телефон", 3);
+        root.addView(phoneInput);
+
+        space(root, 18);
+        root.addView(label("Рамз", 14, WHITE, true));
+        passwordInput = field(
+                "Рамзи худро ворид кун", 129);
+        root.addView(passwordInput);
+
+        space(root, 15);
+
+        TextView enter = button("ВОРИД ШУДАН");
+        enter.setOnClickListener(v -> {
+            String phone = phoneInput.getText().toString().trim();
+            String password =
+                    passwordInput.getText().toString();
+
+            if (phone.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this,
+                        "Ҳамаи майдонҳоро пур кун",
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this,
+                        "Қадами навбатӣ: пайваст кардани Firebase",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+        root.addView(enter);
+
+        TextView register = label(
+                "Ҳисоб надорӣ? Сабти ном кун",
+                14, WHITE, true);
+        register.setGravity(Gravity.CENTER);
+        register.setPadding(0, dp(24), 0, dp(10));
+        register.setOnClickListener(v -> showRegister());
+        root.addView(register);
+    }
+
+    private void showRegister() {
+        LinearLayout root = baseLayout();
+
+        TextView back = label("←  Бозгашт", 15, MUTED, true);
+        back.setOnClickListener(v -> showHome());
+        root.addView(back);
+
+        space(root, 30);
+        addBrand(root);
+        space(root, 30);
+
+        root.addView(label("Ҳисоб соз", 27, WHITE, true));
+        space(root, 8);
+        root.addView(label(
+                "Ба оилаи RIVO ҳамроҳ шав.",
+                14, MUTED, false));
+
+        space(root, 22);
+
+        root.addView(label("Номи ту", 14, WHITE, true));
+        nameInput = field("Ном ва насаб", 1);
+        root.addView(nameInput);
+
+        space(root, 15);
+        root.addView(label("Рақами телефон", 14, WHITE, true));
+        phoneInput = field("Рақами телефон", 3);
+        root.addView(phoneInput);
+
+        space(root, 15);
+        root.addView(label("Сохтани рамз", 14, WHITE, true));
+        passwordInput = field("Камаш 6 аломат", 129);
+        root.addView(passwordInput);
+
+        space(root, 15);
+
+        TextView create = button("СОХТАНИ ҲИСОБ");
+        create.setOnClickListener(v -> {
+            String name = nameInput.getText().toString().trim();
+            String phone = phoneInput.getText().toString().trim();
+            String password = passwordInput.getText().toString();
+
+            if (name.isEmpty() || phone.isEmpty()
+                    || password.isEmpty()) {
+                Toast.makeText(this,
+                        "Ҳамаи майдонҳоро пур кун",
+                        Toast.LENGTH_SHORT).show();
+            } else if (password.length() < 6) {
+                Toast.makeText(this,
+                        "Рамз бояд камаш 6 аломат дошта бошад",
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this,
+                        "Интерфейс омода аст. Барои сохтани ҳисоб Firebase лозим аст.",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+        root.addView(create);
+
+        TextView login = label(
+                "Аллакай ҳисоб дорӣ? Ворид шав",
+                14, WHITE, true);
+        login.setGravity(Gravity.CENTER);
+        login.setPadding(0, dp(22), 0, dp(10));
+        login.setOnClickListener(v -> showLogin());
+        root.addView(login);
+    }
+            }
