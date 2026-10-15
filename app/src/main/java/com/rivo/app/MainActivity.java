@@ -427,7 +427,7 @@ public class MainActivity extends Activity {
         page.addView(start, matchWrap());
 
         setContentView(page);
-        
+    }
     private String makeChatId(String phoneA, String phoneB) {
         if (phoneA == null) phoneA = "";
         if (phoneB == null) phoneB = "";
