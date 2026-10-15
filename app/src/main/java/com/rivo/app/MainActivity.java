@@ -89,7 +89,7 @@ public class MainActivity extends Activity {
         page.setBackgroundColor(DARK);
 
         TextView logo = new TextView(this);
-        logo.setText("LINKO");
+        logo.setText("RIVO");
         logo.setTextSize(38);
         logo.setTextColor(GREEN);
         logo.setTypeface(null, Typeface.BOLD);
@@ -171,7 +171,7 @@ public class MainActivity extends Activity {
                                             sendCode.setEnabled(true);
                                             codeInput.setVisibility(View.VISIBLE);
                                             verifyCode.setVisibility(View.VISIBLE);
-                                            toast("Рамз ба рақами ту фиристода шуд");
+                                            toast("Рамз фиристода шуд");
                                         }
                                     })
                             .build();
@@ -226,7 +226,7 @@ public class MainActivity extends Activity {
         header.setBackgroundColor(PANEL);
 
         TextView title = new TextView(this);
-        title.setText("LINKO");
+        title.setText("RIVO");
         title.setTextColor(GREEN);
         title.setTextSize(28);
         title.setTypeface(null, Typeface.BOLD);
@@ -239,10 +239,8 @@ public class MainActivity extends Activity {
         myPhone.setTextSize(12);
         myPhone.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
 
-        header.addView(title, new LinearLayout.LayoutParams(
-                0, -2, 1));
-        header.addView(myPhone, new LinearLayout.LayoutParams(
-                0, -2, 1));
+        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        header.addView(myPhone, new LinearLayout.LayoutParams(0, -2, 1));
 
         Button newChat = makeButton("+ Чати нав");
         newChat.setOnClickListener(v -> showNewChat());
@@ -257,23 +255,17 @@ public class MainActivity extends Activity {
 
         page.addView(header, matchWrap());
         page.addView(newChat, matchWrap());
-        page.addView(scroll, new LinearLayout.LayoutParams(
-                -1, 0, 1));
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         setContentView(page);
         loadChats();
-        
     }
 
     private void loadChats() {
-        if (auth.getCurrentUser() == null) {
-            return;
-        }
+        if (auth.getCurrentUser() == null) return;
 
         String myPhone = auth.getCurrentUser().getPhoneNumber();
-        if (myPhone == null) {
-            return;
-        }
+        if (myPhone == null) return;
 
         if (chatsListener != null) {
             chatsListener.remove();
@@ -287,9 +279,7 @@ public class MainActivity extends Activity {
                         return;
                     }
 
-                    if (snapshots == null || chatsLayout == null) {
-                        return;
-                    }
+                    if (snapshots == null || chatsLayout == null) return;
 
                     chatsLayout.removeAllViews();
 
@@ -308,9 +298,7 @@ public class MainActivity extends Activity {
                         List<String> members =
                                 (List<String>) doc.get("memberPhones");
 
-                        if (members == null) {
-                            continue;
-                        }
+                        if (members == null) continue;
 
                         String otherPhone = "";
 
@@ -325,8 +313,7 @@ public class MainActivity extends Activity {
                             addChatRow(
                                     doc.getId(),
                                     otherPhone,
-                                    doc.getString("lastMessage")
-                            );
+                                    doc.getString("lastMessage"));
                         }
                     }
                 });
@@ -348,8 +335,7 @@ public class MainActivity extends Activity {
         avatar.setTextColor(GREEN);
         avatar.setTextSize(30);
         avatar.setGravity(Gravity.CENTER);
-        row.addView(avatar, new LinearLayout.LayoutParams(
-                dp(48), dp(48)));
+        row.addView(avatar, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
@@ -370,16 +356,13 @@ public class MainActivity extends Activity {
 
         details.addView(phone);
         details.addView(preview);
+        row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
-        row.addView(details, new LinearLayout.LayoutParams(
-                0, -2, 1));
-
-        LinearLayout.LayoutParams rowParams =
+        LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, -2);
-        rowParams.setMargins(0, 5, 0, 5);
+        params.setMargins(0, 5, 0, 5);
 
-        chatsLayout.addView(row, rowParams);
-
+        chatsLayout.addView(row, params);
         row.setOnClickListener(v -> openChat(otherPhone));
     }
 
@@ -400,9 +383,7 @@ public class MainActivity extends Activity {
         heading.setPadding(0, 25, 0, 20);
 
         TextView description = new TextView(this);
-        description.setText(
-                "Рақами телефони шахси дигарро бо рамзи кишвар навис."
-        );
+        description.setText("Рақами телефони шахси дигарро бо рамзи кишвар навис.");
         description.setTextColor(MUTED);
         description.setTextSize(15);
 
@@ -416,24 +397,22 @@ public class MainActivity extends Activity {
 
         Button start = makeButton("Кушодани чат");
         start.setOnClickListener(v -> {
-            String otherPhone =
-                    otherPhoneInput.getText().toString().trim();
+            String otherPhone = otherPhoneInput.getText().toString().trim();
 
-            if (!otherPhone.startsWith("+")
-                    || otherPhone.length() < 8) {
+            if (!otherPhone.startsWith("+") || otherPhone.length() < 8) {
                 toast("Рақами дурустро бо + навис");
                 return;
             }
 
-            if (auth.getCurrentUser() == null
-                    || auth.getCurrentUser().getPhoneNumber() == null) {
+            FirebaseUser user = auth.getCurrentUser();
+
+            if (user == null || user.getPhoneNumber() == null) {
                 toast("Аввал ба барнома ворид шав");
                 showLogin();
                 return;
             }
 
-            if (otherPhone.equals(
-                    auth.getCurrentUser().getPhoneNumber())) {
+            if (otherPhone.equals(user.getPhoneNumber())) {
                 toast("Рақами худатро ворид накун");
                 return;
             }
@@ -449,301 +428,4 @@ public class MainActivity extends Activity {
 
         setContentView(page);
     }
-
-    private String makeChatId(String phoneA, String phoneB) {
-        List<String> phones = new ArrayList<>();
-        phones.add(phoneA);
-        phones.add(phoneB);
-        Collections.sort(phones);
-
-        return phones.get(0).replace("+", "")
-                + "_" + phones.get(1).replace("+", "");
-    }
-
-    private void openChat(String otherPhone) {
-        if (auth.getCurrentUser() == null
-                || auth.getCurrentUser().getPhoneNumber() == null) {
-            showLogin();
-            return;
-        }
-
-        String myPhone = auth.getCurrentUser().getPhoneNumber();
-        String chatId = makeChatId(myPhone, otherPhone);
-
-        db.collection("chats")
-                .document(chatId)
-                .get()
-                .addOnSuccessListener(document -> {
-                    if (document.exists()) {
-                        currentChatId = chatId;
-                        currentOtherPhone = otherPhone;
-                        showChat();
-                        return;
-                    }
-
-                    Map<String, Object> chat = new HashMap<>();
-                    chat.put("memberPhones",
-                            Arrays.asList(myPhone, otherPhone));
-                    chat.put("createdAt", FieldValue.serverTimestamp());
-                    chat.put("lastMessage", "");
-                    chat.put("lastSender", "");
-
-                    db.collection("chats")
-                            .document(chatId)
-                            .set(chat)
-                            .addOnSuccessListener(unused -> {
-                                currentChatId = chatId;
-                                currentOtherPhone = otherPhone;
-                                showChat();
-                            })
-                            .addOnFailureListener(e ->
-                                    toast("Чат сохта нашуд: " + e.getMessage()));
-                })
-                .addOnFailureListener(e ->
-                        toast("Хатогӣ: " + e.getMessage()));
-    }
-
-    private void showChat() {
-        if (messagesListener != null) {
-            messagesListener.remove();
-            messagesListener = null;
-        }
-
-        page = new LinearLayout(this);
-        page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(DARK);
-
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(8, 8, 12, 8);
-        header.setBackgroundColor(PANEL);
-
-        Button back = makeButton("←");
-        back.setOnClickListener(v -> showHome());
-
-        TextView person = new TextView(this);
-        person.setText(currentOtherPhone);
-        person.setTextColor(WHITE);
-        person.setTextSize(17);
-        person.setTypeface(null, Typeface.BOLD);
-        person.setPadding(12, 0, 0, 0);
-
-        header.addView(back);
-        header.addView(person, new LinearLayout.LayoutParams(
-                0, -2, 1));
-
-        messagesLayout = new LinearLayout(this);
-        messagesLayout.setOrientation(LinearLayout.VERTICAL);
-        messagesLayout.setPadding(8, 12, 8, 12);
-
-        messagesScroll = new ScrollView(this);
-        messagesScroll.setFillViewport(true);
-        messagesScroll.addView(messagesLayout);
-
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.CENTER_VERTICAL);
-        bottom.setPadding(8, 6, 8, 8);
-        bottom.setBackgroundColor(PANEL);
-
-        input = new EditText(this);
-        input.setHint("Паём навис...");
-        input.setHintTextColor(MUTED);
-        input.setTextColor(WHITE);
-        input.setTextSize(16);
-        input.setMinHeight(dp(48));
-        input.setPadding(14, 8, 14, 8);
-        input.setBackground(makeBackground(DARK, 24));
-
-        Button send = makeButton("➤");
-
-        bottom.addView(input, new LinearLayout.LayoutParams(
-                0, -2, 1));
-
-        LinearLayout.LayoutParams sendParams =
-                new LinearLayout.LayoutParams(-2, -2);
-        sendParams.setMargins(6, 0, 0, 0);
-        bottom.addView(send, sendParams);
-
-        send.setOnClickListener(v -> {
-            String body = input.getText().toString().trim();
-
-            if (body.isEmpty()) {
-                toast("Паём навис");
-                return;
-            }
-
-            FirebaseUser user = auth.getCurrentUser();
-
-            if (user == null || user.getPhoneNumber() == null) {
-                toast("Аввал ворид шав");
-                return;
-            }
-
-            if (currentChatId.isEmpty()) {
-                toast("Аввал чатро интихоб кун");
-                return;
-            }
-
-            Map<String, Object> message = new HashMap<>();
-            message.put("text", body);
-            message.put("senderPhone", user.getPhoneNumber());
-            message.put("createdAt", FieldValue.serverTimestamp());
-
-            send.setEnabled(false);
-
-            db.collection("chats")
-                    .document(currentChatId)
-                    .collection("messages")
-                    .add(message)
-                    .addOnSuccessListener(documentReference -> {
-                        input.setText("");
-                        Map<String, Object> update = new HashMap<>();
-                        update.put("lastMessage", body);
-                        update.put("lastSender", user.getPhoneNumber());
-                        update.put("updatedAt", FieldValue.serverTimestamp());
-
-                        db.collection("chats")
-                                .document(currentChatId)
-                                .update(update);
-                        send.setEnabled(true);
-                    })
-                    .addOnFailureListener(e -> {
-                        send.setEnabled(true);
-                        toast("Паём фиристода нашуд: " + e.getMessage());
-                    });
-        });
-
-        page.addView(header, matchWrap());
-        page.addView(messagesScroll, new LinearLayout.LayoutParams(
-                -1, 0, 1));
-        page.addView(bottom, matchWrap());
-
-        setContentView(page);
-        listenMessages();
-    }
-
-    private void listenMessages() {
-        if (currentChatId == null || currentChatId.isEmpty()) {
-            return;
-        }
-
-        if (messagesListener != null) {
-            messagesListener.remove();
-        }
-
-        messagesListener = db.collection("chats")
-                .document(currentChatId)
-                .collection("messages")
-                .orderBy("createdAt", Query.Direction.ASCENDING)
-                .addSnapshotListener((snapshots, error) -> {
-                    if (error != null) {
-                        toast("Хатои паёмҳо: " + error.getMessage());
-                        return;
-                    }
-
-                    if (snapshots == null || messagesLayout == null) {
-                        return;
-                    }
-
-                    messagesLayout.removeAllViews();
-
-                    for (DocumentSnapshot doc : snapshots.getDocuments()) {
-                        String body = doc.getString("text");
-                        String sender = doc.getString("senderPhone");
-
-                        if (body == null) body = "";
-                        if (sender == null) sender = "";
-
-                        FirebaseUser user = auth.getCurrentUser();
-                        boolean mine = user != null
-                                && sender.equals(user.getPhoneNumber());
-
-                        TextView bubble = new TextView(this);
-                        bubble.setText(body);
-                        bubble.setTextSize(16);
-                        bubble.setTextColor(WHITE);
-                        bubble.setPadding(
-                                dp(14), dp(10), dp(14), dp(10));
-                        bubble.setMaxWidth((int) (
-                                getResources().getDisplayMetrics().widthPixels
-                                        * 0.75f));
-                        bubble.setBackground(makeBackground(
-                                mine ? GREEN : PANEL, 18));
-
-                        LinearLayout.LayoutParams params =
-                                new LinearLayout.LayoutParams(
-                                        -2, -2);
-                        params.setMargins(
-                                dp(5), dp(4), dp(5), dp(4));
-                        params.gravity = mine
-                                ? Gravity.RIGHT : Gravity.LEFT;
-
-                        messagesLayout.addView(bubble, params);
-                    }
-
-                    if (messagesScroll != null) {
-                        messagesScroll.post(() ->
-                                messagesScroll.fullScroll(View.FOCUS_DOWN));
-                    }
-                });
-    }
-
-    private Button makeButton(String text) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setTextColor(WHITE);
-        button.setTextSize(15);
-        button.setAllCaps(false);
-        button.setBackground(makeBackground(GREEN, 16));
-        return button;
-    }
-
-    private void styleInput(EditText editText) {
-        editText.setPadding(dp(14), dp(10), dp(14), dp(10));
-        editText.setBackground(makeBackground(PANEL, 14));
-
-        LinearLayout.LayoutParams params = matchWrap();
-        params.setMargins(0, dp(8), 0, dp(8));
-        editText.setLayoutParams(params);
-    }
-
-    private GradientDrawable makeBackground(int color, int radius) {
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(color);
-        shape.setCornerRadius(dp(radius));
-        return shape;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(-1, -2);
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources()
-                .getDisplayMetrics().density + 0.5f);
-    }
-
-    private void toast(String message) {
-        Toast.makeText(
-                this, message, Toast.LENGTH_LONG).show();
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (chatsListener != null) {
-            chatsListener.remove();
-        }
-
-        if (messagesListener != null) {
-            messagesListener.remove();
-        }
-
-        super.onDestroy();
-    }
-                    }
-                                
-    }
-
-            
+    
