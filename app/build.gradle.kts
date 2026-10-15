@@ -12,12 +12,17 @@ android {
         applicationId = "com.rivo.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 8
-        versionName = "8.0"
+        versionCode = 9
+        versionName = "9.0"
     }
 }
 
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
+
+    // Firebase телефон ва SMS
     implementation("com.google.firebase:firebase-auth")
+
+    // Firebase база барои чат ва паёмҳо
+    implementation("com.google.firebase:firebase-firestore")
 }
