@@ -427,5 +427,337 @@ public class MainActivity extends Activity {
         page.addView(start, matchWrap());
 
         setContentView(page);
+        
+    private String makeChatId(String phoneA, String phoneB) {
+        if (phoneA == null) phoneA = "";
+        if (phoneB == null) phoneB = "";
+
+        if (phoneA.compareTo(phoneB) < 0) {
+            return phoneA.replace("+", "") + "_" +
+                    phoneB.replace("+", "");
+        }
+
+        return phoneB.replace("+", "") + "_" +
+                phoneA.replace("+", "");
     }
-    
+
+    private void openChat(String otherPhone) {
+        if (auth.getCurrentUser() == null) {
+            toast("Аввал ворид шав!");
+            showLogin();
+            return;
+        }
+
+        String myPhone = auth.getCurrentUser().getPhoneNumber();
+
+        if (myPhone == null || myPhone.isEmpty()) {
+            toast("Рақами телефони худро тасдиқ кун.");
+            return;
+        }
+
+        otherPhone = otherPhone.trim();
+
+        if (!otherPhone.startsWith("+") || otherPhone.length() < 8) {
+            toast("Рақамро бо рамзи кишвар навис. Масалан: +992900000000");
+            return;
+        }
+
+        if (myPhone.equals(otherPhone)) {
+            toast("Рақами худатро ворид карда наметавонӣ.");
+            return;
+        }
+
+        currentOtherPhone = otherPhone;
+        currentChatId = makeChatId(myPhone, otherPhone);
+
+        final String finalOtherPhone = otherPhone;
+        final String finalMyPhone = myPhone;
+        final String finalChatId = currentChatId;
+
+        db.collection("chats")
+                .document(finalChatId)
+                .get()
+                .addOnSuccessListener(document -> {
+                    if (!document.exists()) {
+                        Map<String, Object> chat = new HashMap<>();
+                        chat.put("memberPhones",
+                                Arrays.asList(finalMyPhone, finalOtherPhone));
+                        chat.put("createdAt",
+                                com.google.firebase.firestore.FieldValue.serverTimestamp());
+                        chat.put("updatedAt",
+                                com.google.firebase.firestore.FieldValue.serverTimestamp());
+                        chat.put("lastMessage", "");
+                        chat.put("lastSender", "");
+
+                        db.collection("chats")
+                                .document(finalChatId)
+                                .set(chat)
+                                .addOnSuccessListener(unused -> {
+                                    currentChatId = finalChatId;
+                                    currentOtherPhone = finalOtherPhone;
+                                    showChat();
+                                })
+                                .addOnFailureListener(e ->
+                                        toast("Чат сохта нашуд: " + e.getMessage()));
+                    } else {
+                        currentChatId = finalChatId;
+                        currentOtherPhone = finalOtherPhone;
+                        showChat();
+                    }
+                })
+                .addOnFailureListener(e ->
+                        toast("Хатогӣ: " + e.getMessage()));
+    }
+
+    private void showChat() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(16), dp(12), dp(16), dp(12));
+        root.setBackground(makeBackground(Color.rgb(12, 25, 23)));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, dp(8), 0, dp(14));
+
+        Button back = makeButton("‹", Color.rgb(35, 55, 50));
+        header.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        TextView name = new TextView(this);
+        name.setText(currentOtherPhone);
+        name.setTextColor(Color.WHITE);
+        name.setTextSize(17);
+        name.setTypeface(null, Typeface.BOLD);
+        name.setPadding(dp(12), 0, 0, 0);
+        header.addView(name, new LinearLayout.LayoutParams(
+                0, -2, 1
+        ));
+
+        root.addView(header);
+
+        messagesLayout = new LinearLayout(this);
+        messagesLayout.setOrientation(LinearLayout.VERTICAL);
+        messagesLayout.setPadding(0, dp(8), 0, dp(8));
+
+        messagesScroll = new ScrollView(this);
+        messagesScroll.setFillViewport(true);
+        messagesScroll.addView(messagesLayout);
+
+        root.addView(messagesScroll,
+                new LinearLayout.LayoutParams(
+                        -1, 0, 1
+                ));
+
+        LinearLayout sendRow = new LinearLayout(this);
+        sendRow.setGravity(Gravity.CENTER_VERTICAL);
+        sendRow.setPadding(0, dp(12), 0, 0);
+
+        messageInput = new EditText(this);
+        styleInput(messageInput, "Паём навис...");
+        messageInput.setSingleLine(false);
+        messageInput.setMaxLines(4);
+        messageInput.setTextSize(15);
+
+        LinearLayout.LayoutParams inputParams =
+                new LinearLayout.LayoutParams(0, -2, 1);
+        inputParams.setMargins(0, 0, dp(8), 0);
+        sendRow.addView(messageInput, inputParams);
+
+        Button send = makeButton("➤", Color.rgb(0, 190, 125));
+        send.setTextColor(Color.WHITE);
+        sendRow.addView(send,
+                new LinearLayout.LayoutParams(dp(52), dp(52)));
+
+        root.addView(sendRow);
+        setContentView(root);
+
+        back.setOnClickListener(v -> {
+            if (messageListener != null) {
+                messageListener.remove();
+                messageListener = null;
+            }
+            showHome();
+        });
+
+        send.setOnClickListener(v -> sendMessage());
+        messageInput.setOnEditorActionListener((v, actionId, event) -> {
+            sendMessage();
+            return true;
+        });
+
+        listenMessages();
+    }
+
+    private void sendMessage() {
+        if (auth.getCurrentUser() == null ||
+                currentChatId == null ||
+                messageInput == null) {
+            toast("Чат дастрас нест.");
+            return;
+        }
+
+        String text = messageInput.getText().toString().trim();
+
+        if (text.isEmpty()) return;
+
+        String senderPhone = auth.getCurrentUser().getPhoneNumber();
+
+        if (senderPhone == null) {
+            toast("Рақами тасдиқшуда ёфт нашуд.");
+            return;
+        }
+
+        String chatId = currentChatId;
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("text", text);
+        message.put("senderPhone", senderPhone);
+        message.put("createdAt",
+                com.google.firebase.firestore.FieldValue.serverTimestamp());
+
+        messageInput.setText("");
+
+        db.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .add(message)
+                .addOnSuccessListener(documentReference ->
+                        db.collection("chats")
+                                .document(chatId)
+                                .update(
+                                        "lastMessage", text,
+                                        "lastSender", senderPhone,
+                                        "updatedAt",
+                                        com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                )
+                                .addOnFailureListener(e ->
+                                        toast("Паём фиристода шуд, вале рӯйхати чат нав нашуд.")))
+                .addOnFailureListener(e -> {
+                    if (messageInput != null) {
+                        messageInput.setText(text);
+                    }
+                    toast("Паём фиристода нашуд: " + e.getMessage());
+                });
+    }
+
+    private void listenMessages() {
+        if (messageListener != null) {
+            messageListener.remove();
+            messageListener = null;
+        }
+
+        if (currentChatId == null) return;
+
+        messageListener = db.collection("chats")
+                .document(currentChatId)
+                .collection("messages")
+                .orderBy("createdAt",
+                        com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        toast("Хатогии паёмҳо: " + error.getMessage());
+                        return;
+                    }
+
+                    if (snapshots == null || messagesLayout == null) return;
+
+                    messagesLayout.removeAllViews();
+
+                    String myPhone = auth.getCurrentUser() == null
+                            ? ""
+                            : auth.getCurrentUser().getPhoneNumber();
+
+                    for (com.google.firebase.firestore.DocumentSnapshot doc
+                            : snapshots.getDocuments()) {
+
+                        String text = doc.getString("text");
+                        String sender = doc.getString("senderPhone");
+
+                        if (text == null) text = "";
+
+                        boolean mine = myPhone != null &&
+                                myPhone.equals(sender);
+
+                        LinearLayout row = new LinearLayout(this);
+                        row.setGravity(mine
+                                ? Gravity.END
+                                : Gravity.START);
+
+                        TextView bubble = new TextView(this);
+                        bubble.setText(text);
+                        bubble.setTextColor(Color.WHITE);
+                        bubble.setTextSize(15);
+                        bubble.setPadding(
+                                dp(14), dp(10), dp(14), dp(10));
+                        bubble.setMaxWidth(
+                                (int) (getResources()
+                                        .getDisplayMetrics().widthPixels * 0.75));
+
+                        bubble.setBackground(makeBackground(
+                                mine
+                                        ? Color.rgb(0, 135, 95)
+                                        : Color.rgb(42, 58, 54)
+                        ));
+
+                        LinearLayout.LayoutParams bubbleParams =
+                                new LinearLayout.LayoutParams(-2, -2);
+                        bubbleParams.setMargins(
+                                dp(2), dp(4), dp(2), dp(4));
+
+                        row.addView(bubble, bubbleParams);
+
+                        messagesLayout.addView(row,
+                                new LinearLayout.LayoutParams(-1, -2));
+                    }
+
+                    messagesScroll.post(() ->
+                            messagesScroll.fullScroll(View.FOCUS_DOWN));
+                });
+    }
+
+    private Button makeButton(String text, int color) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setTextSize(15);
+        button.setAllCaps(false);
+        button.setTextColor(Color.WHITE);
+        button.setBackground(makeBackground(color));
+        return button;
+    }
+
+    private void styleInput(EditText input, String hint) {
+        input.setHint(hint);
+        input.setHintTextColor(Color.rgb(155, 175, 168));
+        input.setTextColor(Color.WHITE);
+        input.setSingleLine(true);
+        input.setPadding(dp(14), dp(12), dp(14), dp(12));
+        input.setBackground(makeBackground(Color.rgb(35, 49, 45)));
+    }
+
+    private android.graphics.drawable.GradientDrawable makeBackground(int color) {
+        android.graphics.drawable.GradientDrawable drawable =
+                new android.graphics.drawable.GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(16));
+        return drawable;
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources()
+                .getDisplayMetrics().density + 0.5f);
+    }
+
+    private void toast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (messageListener != null) {
+            messageListener.remove();
+            messageListener = null;
+        }
+
+        super.onDestroy();
+    }
+            }
+
